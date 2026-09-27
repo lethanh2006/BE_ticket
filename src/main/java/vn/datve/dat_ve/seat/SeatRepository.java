@@ -4,10 +4,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+
+import java.util.Collection;
+
 import java.util.List;
 
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 
+    // đọc danh sách ghế + trạng thái
     @Query(value = """
             SELECT s.id          AS "id",
                    s.seat_code   AS "seatCode",
@@ -35,4 +41,19 @@ public interface SeatRepository extends JpaRepository<Seat, Long> {
             ORDER BY s.id
             """, nativeQuery = true)
     List<SeatStatusView> findSeatsWithStatus(@Param("showtimeId") Long showtimeId);
+
+
+    //lấy + khóa các ghế để booking
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT s
+        FROM Seat s
+        WHERE s.showtimeId = :showtimeId
+          AND s.id IN :seatIds
+        ORDER BY s.id
+        """)
+    List<Seat> findSeatsForUpdate(
+            @Param("showtimeId") Long showtimeId,
+            @Param("seatIds") Collection<Long> seatIds
+    );
 }
