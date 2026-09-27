@@ -15,7 +15,7 @@ public class ShowtimeController {
     public ShowtimeController(ShowtimeService showtimeService) {
         this.showtimeService = showtimeService;
     }
-
+    // danh sách suất diễn của 1 sự kiện
     @GetMapping("/api/events/{eventId}/showtimes")
     public List<ShowtimeResponse> listByEvent(@PathVariable Long eventId) {
         return showtimeService.findByEventId(eventId);

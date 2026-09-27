@@ -15,7 +15,7 @@ public class SeatController {
     public SeatController(SeatService seatService) {
         this.seatService = seatService;
     }
-
+    //danh sách ghế của 1 suất
     @GetMapping("/api/showtimes/{showtimeId}/seats")
     public List<SeatResponse> listSeats(@PathVariable Long showtimeId) {
         return seatService.findByShowtimeId(showtimeId);

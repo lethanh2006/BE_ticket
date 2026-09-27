@@ -18,13 +18,13 @@ public class EventController {
     public EventController(EventService eventService) {
         this.eventService = eventService;
     }
-
+    // danh sách sự kiện (có phân trang)
     @GetMapping
     public PageResponse<EventResponse> list(
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         return eventService.findAll(pageable);
     }
-
+    // chi tiết 1 sự kiện
     @GetMapping("/{id}")
     public EventResponse get(@PathVariable Long id) {
         return eventService.findById(id);
