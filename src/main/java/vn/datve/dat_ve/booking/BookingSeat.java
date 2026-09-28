@@ -68,4 +68,8 @@ public class BookingSeat {
     public BigDecimal getUnitPrice() {
         return unitPrice;
     }
+
+    public void release() {
+        this.reservationStatus = BookingSeatStatus.RELEASED;
+    }
 }

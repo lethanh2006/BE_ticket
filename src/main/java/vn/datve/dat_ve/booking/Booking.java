@@ -70,4 +70,8 @@ public class Booking {
     public Instant getExpiresAt() {
         return expiresAt;
     }
+
+    public void expire() {
+        this.status = BookingStatus.EXPIRED;
+    }
 }
