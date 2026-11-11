@@ -1,6 +1,8 @@
 spring:
   application:
     name: dat-ve
+  config:
+    import: optional:file:.env[.properties]   # chạy local: đọc biến từ file .env nếu có
   profiles:
     default: dev
     group:
