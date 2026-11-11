@@ -1,32 +1,43 @@
 package vn.datve.dat_ve.event;
 
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import java.util.List;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import vn.datve.dat_ve.common.response.PageResponse;
-import vn.datve.dat_ve.event.dto.EventResponse;
+import vn.datve.dat_ve.event.dto.EventSummary;
 
 @RestController
 @RequestMapping("/api/events")
 public class EventController {
 
-    private final EventService eventService;
+    private final EventQueryService eventQueryService;
 
-    public EventController(EventService eventService) {
-        this.eventService = eventService;
+    public EventController(EventQueryService eventQueryService) {
+        this.eventQueryService = eventQueryService;
     }
-    // danh sách sự kiện (có phân trang)
+
+    // danh sách sự kiện: tìm kiếm không dấu, lọc thể loại, phân trang (page bắt đầu từ 0)
     @GetMapping
-    public PageResponse<EventResponse> list(
-            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        return eventService.findAll(pageable);
+    public PageResponse<EventSummary> list(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return eventQueryService.search(q, category, page, size);
     }
+
+    @GetMapping("/categories")
+    public List<String> categories() {
+        return eventQueryService.categories();
+    }
+
     // chi tiết 1 sự kiện
     @GetMapping("/{id}")
-    public EventResponse get(@PathVariable Long id) {
-        return eventService.findById(id);
+    public EventSummary get(@PathVariable Long id) {
+        return eventQueryService.get(id);
     }
 }

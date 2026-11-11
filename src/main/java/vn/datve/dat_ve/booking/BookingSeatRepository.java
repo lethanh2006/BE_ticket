@@ -1,9 +1,9 @@
 package vn.datve.dat_ve.booking;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.Collection;
 import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookingSeatRepository
         extends JpaRepository<BookingSeat, Long> {
@@ -17,4 +17,6 @@ public interface BookingSeatRepository
             Collection<Long> bookingIds,
             BookingSeatStatus status
     );
+
+    List<BookingSeat> findByBookingIdAndReservationStatus(Long bookingId, BookingSeatStatus status);
 }

@@ -1,13 +1,13 @@
 package vn.datve.dat_ve.showtime;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.time.Instant;
 
 @Entity
 @Table(name = "showtimes")
@@ -27,6 +27,12 @@ public class Showtime {
     private Instant endTime;
 
     protected Showtime() {
+    }
+
+    public Showtime(Long eventId, Instant startTime, Instant endTime) {
+        this.eventId = eventId;
+        this.startTime = startTime;
+        this.endTime = endTime;
     }
 
     public Long getId() { return id; }

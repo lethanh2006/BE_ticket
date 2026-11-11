@@ -1,22 +1,25 @@
 package vn.datve.dat_ve.booking;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.datve.dat_ve.booking.dto.BookingResponse;
-import vn.datve.dat_ve.booking.dto.BookingSeatResponse;
 import vn.datve.dat_ve.booking.dto.CreateBookingRequest;
 import vn.datve.dat_ve.common.exception.ApiException;
 import vn.datve.dat_ve.seat.Seat;
 import vn.datve.dat_ve.seat.SeatRepository;
+import vn.datve.dat_ve.seat.SeatsChangedEvent;
+import vn.datve.dat_ve.showtime.Showtime;
 import vn.datve.dat_ve.showtime.ShowtimeRepository;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
 
 @Service
 public class BookingService {
@@ -25,17 +28,26 @@ public class BookingService {
     private final BookingSeatRepository bookingSeatRepository;
     private final SeatRepository seatRepository;
     private final ShowtimeRepository showtimeRepository;
+    private final BookingQueryService bookingQueryService;
+    private final ApplicationEventPublisher events;
+    private final Duration holdDuration;
 
     public BookingService(
             BookingRepository bookingRepository,
             BookingSeatRepository bookingSeatRepository,
             SeatRepository seatRepository,
-            ShowtimeRepository showtimeRepository
+            ShowtimeRepository showtimeRepository,
+            BookingQueryService bookingQueryService,
+            ApplicationEventPublisher events,
+            @Value("${app.booking.hold-duration}") Duration holdDuration
     ) {
         this.bookingRepository = bookingRepository;
         this.bookingSeatRepository = bookingSeatRepository;
         this.seatRepository = seatRepository;
         this.showtimeRepository = showtimeRepository;
+        this.bookingQueryService = bookingQueryService;
+        this.events = events;
+        this.holdDuration = holdDuration;
     }
 
     @Transactional
@@ -56,16 +68,18 @@ public class BookingService {
             );
         }
 
-        // 2. Kiểm tra showtime tồn tại
-        if (!showtimeRepository.existsById(showtimeId)) {
-            throw new ApiException(
-                    HttpStatus.NOT_FOUND,
-                    "SHOWTIME_NOT_FOUND",
-                    "Không tìm thấy suất diễn có id " + showtimeId
-            );
+        // 2. Kiểm tra showtime tồn tại và chưa bắt đầu
+        Showtime showtime = showtimeRepository.findById(showtimeId).orElseThrow(() -> new ApiException(
+                HttpStatus.NOT_FOUND,
+                "SHOWTIME_NOT_FOUND",
+                "Không tìm thấy suất diễn có id " + showtimeId
+        ));
+        Instant now = Instant.now();
+        if (!showtime.getStartTime().isAfter(now)) {
+            throw new ApiException(HttpStatus.CONFLICT, "SHOWTIME_STARTED", "Suất diễn đã bắt đầu, không thể đặt vé");
         }
 
-        // 3. Lock những ghế user muốn giữ
+        // 3. Lock những ghế user muốn giữ (theo thứ tự id để hai request không khoá chéo nhau)
         List<Seat> seats =
                 seatRepository.findSeatsForUpdate(showtimeId, seatIds);
 
@@ -77,8 +91,6 @@ public class BookingService {
                     "Một hoặc nhiều ghế không tồn tại trong suất diễn này"
             );
         }
-
-        Instant now = Instant.now();
 
         // 5. Tìm những booking hết hạn đang giữ các ghế này
         List<Long> expiredBookingIds =
@@ -130,14 +142,13 @@ public class BookingService {
             );
         }
 
-        // 7. Tính tổng tiền từ database
+        // 7. Tính tổng tiền từ database (không tin giá client gửi lên)
         BigDecimal totalAmount = seats.stream()
                 .map(Seat::getFaceValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 8. Giữ ghế 5 phút
-        Instant expiresAt =
-                now.plus(5, ChronoUnit.MINUTES);
+        // 8. Giữ ghế trong thời gian cấu hình (mặc định 5 phút) chờ thanh toán
+        Instant expiresAt = now.plus(holdDuration);
 
         // 9. Tạo booking
         Booking booking = new Booking(
@@ -151,39 +162,43 @@ public class BookingService {
         bookingRepository.save(booking);
 
         // 10. Tạo các booking_seats HELD
+        // (unique index một-giữ-chỗ-mỗi-ghế trong DB là chốt chặn cuối nếu code có sai sót)
         List<BookingSeat> bookingSeats = new ArrayList<>();
 
         for (Seat seat : seats) {
-            BookingSeat bookingSeat = new BookingSeat(
+            bookingSeats.add(new BookingSeat(
                     booking.getId(),
                     showtimeId,
                     seat.getId(),
                     BookingSeatStatus.HELD,
                     seat.getFaceValue()
-            );
-
-            bookingSeats.add(bookingSeat);
+            ));
         }
 
         bookingSeatRepository.saveAll(bookingSeats);
+        bookingSeatRepository.flush();
 
-        // 11. Tạo response
-        List<BookingSeatResponse> seatResponses =
-                seats.stream()
-                        .map(seat -> new BookingSeatResponse(
-                                seat.getId(),
-                                seat.getSeatCode(),
-                                seat.getFaceValue()
-                        ))
-                        .toList();
+        // 11. Báo cho các trình duyệt đang xem sơ đồ ghế (gửi sau khi commit)
+        events.publishEvent(new SeatsChangedEvent(showtimeId));
 
-        return new BookingResponse(
-                booking.getId(),
-                showtimeId,
-                BookingStatus.PENDING,
-                seatResponses,
-                totalAmount,
-                expiresAt
-        );
+        return bookingQueryService.getForUser(booking.getId(), userId, false);
+    }
+
+    /** Huỷ đơn đang chờ thanh toán và nhả ghế ngay cho người khác. */
+    @Transactional
+    public BookingResponse cancel(long userId, long bookingId) {
+        Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+                .filter(b -> b.isOwnedBy(userId))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND", "Không tìm thấy đơn đặt vé"));
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new ApiException(HttpStatus.CONFLICT, "BOOKING_NOT_CANCELLABLE",
+                    "Chỉ huỷ được đơn đang chờ thanh toán");
+        }
+        booking.cancel();
+        bookingSeatRepository.findByBookingIdAndReservationStatus(bookingId, BookingSeatStatus.HELD)
+                .forEach(BookingSeat::release);
+        bookingSeatRepository.flush();
+        events.publishEvent(new SeatsChangedEvent(booking.getShowtimeId()));
+        return bookingQueryService.getForUser(bookingId, userId, false);
     }
 }

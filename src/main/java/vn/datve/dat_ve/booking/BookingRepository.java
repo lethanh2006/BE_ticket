@@ -1,12 +1,15 @@
 package vn.datve.dat_ve.booking;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
@@ -24,4 +27,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("seatIds") Collection<Long> seatIds,
             @Param("now") Instant now
     );
+
+    // khoá dòng booking: thanh toán, huỷ và job hết hạn không thể chạy chồng lên nhau
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.id = :id")
+    Optional<Booking> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.ticketCode = :ticketCode")
+    Optional<Booking> findByTicketCodeForUpdate(@Param("ticketCode") String ticketCode);
 }

@@ -72,4 +72,9 @@ public class BookingSeat {
     public void release() {
         this.reservationStatus = BookingSeatStatus.RELEASED;
     }
+
+    /** Ghế đang giữ được bán hẳn khi đơn thanh toán thành công. */
+    public void book() {
+        this.reservationStatus = BookingSeatStatus.BOOKED;
+    }
 }

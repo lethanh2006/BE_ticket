@@ -1,13 +1,14 @@
 package vn.datve.dat_ve.booking.dto;
 
-import jakarta.validation.constraints.NotEmpty;
-
 import java.util.List;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
 public record CreateBookingRequest(
-
         @NotEmpty(message = "Danh sách ghế không được để trống")
-        List<Long> seatIds
-
+        @Size(max = 8, message = "Mỗi lần đặt tối đa 8 ghế")
+        List<@NotNull Long> seatIds
 ) {
 }

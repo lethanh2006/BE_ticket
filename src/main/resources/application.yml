@@ -1,14 +1,18 @@
 spring:
   application:
     name: dat-ve
+  profiles:
+    default: dev
+    group:
+      dev: demo                 # chạy local luôn kèm dữ liệu mẫu
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/datve_db}
     username: ${DB_USERNAME:datve_user}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:}
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: validate        # schema do Flyway quản lý
     properties:
       hibernate:
         jdbc:
@@ -22,6 +26,22 @@ spring:
         default-page-size: 20
         max-page-size: 50
 
+server:
+  port: ${PORT:8080}            # Render/Heroku... truyền cổng qua biến PORT
+
+app:
+  jwt:
+    # HS256 cần khóa tối thiểu 32 byte; production bắt buộc đặt JWT_SECRET
+    secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    expires-in: 24h
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173}
+  booking:
+    hold-duration: 5m           # thời gian giữ ghế chờ thanh toán
+    expiry-check-interval: 1m
+  demo:
+    admin-password: ${DEMO_ADMIN_PASSWORD:Admin@12345}
+
 management:
   endpoints:
     web:
@@ -30,6 +50,8 @@ management:
   endpoint:
     health:
       show-details: never
+      probes:
+        enabled: true
 
-server:
-  port: 8080
+springdoc:
+  paths-to-match: /api/**

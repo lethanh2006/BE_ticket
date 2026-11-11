@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5      # database gói miễn phí: vài kết nối là đủ
+      minimum-idle: 1
