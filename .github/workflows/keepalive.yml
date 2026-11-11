@@ -1,0 +1,44 @@
+# Giữ backend trên Render (gói free) không ngủ trong giờ hành chính.
+#
+# Render free tắt service sau 15 phút không có request, và chỉ cho 750 giờ chạy mỗi
+# tháng cho cả workspace. Workspace đang có 2 backend (ĐặtVé và webBank): chạy cả hai
+# 24/7 sẽ hết giờ vào khoảng giữa tháng và Render khóa luôn đến đầu tháng sau.
+# Nên chỉ ping thứ 2 – thứ 7, 8:00 – 20:00 giờ Việt Nam (~660 giờ/tháng cho cả 2 service).
+# Ngoài khung giờ này, request đầu tiên vẫn tự đánh thức service (mất 1–2 phút).
+name: Keep Render awake
+
+on:
+  schedule:
+    - cron: '2-57/5 1-12 * * 1-6' # 08:02 – 19:57 giờ VN (UTC+7), thứ 2 – thứ 7
+    - cron: '37 3 * * 0'          # Chủ nhật: gia hạn, tránh GitHub tự tắt lịch sau 60 ngày repo không có commit
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  ping:
+    if: github.event.schedule != '37 3 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Ping health check
+        env:
+          URL: https://datve-lethanh-api.onrender.com/actuator/health/readiness
+        run: |
+          # Khởi động nguội có thể mất hơn 90 giây, nên chờ lâu và thử lại vài lần.
+          if curl -fsS --retry 3 --retry-delay 15 --retry-all-errors -m 100 "$URL"; then
+            echo
+          else
+            echo "::warning::Health check thất bại: $URL"
+          fi
+
+  renew:
+    if: github.event.schedule == '37 3 * * 0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bật lại workflow để reset bộ đếm 60 ngày
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keepalive.yml/enable"
