@@ -1,0 +1,5 @@
+app:
+  jwt:
+    secret: test-only-secret-0123456789abcdef0123456789
+  booking:
+    expiry-check-interval: 1h
