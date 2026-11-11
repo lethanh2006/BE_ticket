@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 
 public record CreateBookingRequest(
         @NotEmpty(message = "Danh sách ghế không được để trống")
-        @Size(max = 8, message = "Mỗi lần đặt tối đa 8 ghế")
+        @Size(max = 10, message = "Mỗi lần đặt tối đa 10 ghế")
         List<@NotNull Long> seatIds
 ) {
 }
